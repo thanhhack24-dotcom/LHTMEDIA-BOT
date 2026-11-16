@@ -30,11 +30,7 @@ def init_db():
 
 def tg(method, payload):
     try:
-        r = requests.post(
-            API + method,
-            json=payload,
-            timeout=25
-        )
+        r = requests.post(API + method, json=payload, timeout=25)
         r.raise_for_status()
         return r.json()
     except requests.RequestException as e:
@@ -49,6 +45,7 @@ def send(chat_id, text, markup=None):
     tg("sendMessage", data)
 
 
+# MENU NẰM NGAY DƯỚI TIN NHẮN
 MENU = {
     "inline_keyboard": [
         [
@@ -71,24 +68,37 @@ MENU = {
 
 
 def show_menu(chat_id):
+    # Xóa bàn phím cũ của Telegram
+    tg("sendMessage", {
+        "chat_id": chat_id,
+        "text": "🔄 LHTMEDIA đang cập nhật menu...",
+        "reply_markup": {"remove_keyboard": True}
+    })
+
     text = (
         "🟣 LHTMEDIA MANAGER ⭐️\n"
         "━━━━━━━━━━━━━━━━━━\n"
         "『QUẢN LÝ UID FACEBOOK 📌』\n"
         "✦ Thêm UID và lưu ghi chú\n"
-        "✦ Xem danh sách UID đã lưu\n"
-        "✦ Cập nhật trạng thái thủ công\n"
+        "✦ Xem danh sách UID\n"
+        "✦ Cập nhật trạng thái UID\n"
         "✦ Xem thống kê UID\n"
         "━━━━━━━━━━━━━━━━━━\n"
+        "『QUẢN LÝ HỆ THỐNG 🤖』\n"
+        "✦ Quản lý tài khoản Admin\n"
+        "✦ Hỗ trợ và hướng dẫn\n"
+        "━━━━━━━━━━━━━━━━━━\n"
         "Chọn chức năng bên dưới.\n\n"
-        "⚠️ Bot chưa có API xác minh LIVE/DIE tự động."
+        "⚠️ LIVE/DIE hiện chưa được tự động xác minh."
     )
+
     send(chat_id, text, MENU)
 
 
-def answer_callback(callback_id):
+def answer_callback(callback_id, text=""):
     tg("answerCallbackQuery", {
-        "callback_query_id": callback_id
+        "callback_query_id": callback_id,
+        "text": text
     })
 
 
@@ -110,7 +120,7 @@ def list_uids(chat_id):
             f"#{rid} | UID: {uid}\n"
             f"Trạng thái: {status}\n"
             f"Ghi chú: {note or '—'}\n"
-            f"/setstatus {rid} LIVE hoặc DIE"
+            f"Cập nhật: /setstatus {rid} LIVE|DIE|UNKNOWN"
         )
 
     send(chat_id, "\n\n".join(lines))
@@ -132,12 +142,10 @@ def show_stats(chat_id):
         chat_id,
         "📊 THỐNG KÊ LHTMEDIA\n"
         f"👤 Tổng UID: {total}\n"
-        f"🟢 LIVE: {states.get('LIVE', 0)}\n"
-        f"🔴 DIE: {states.get('DIE', 0)}\n"
-        f"⚪ Không xác định: "
-        f"{states.get('KHÔNG XÁC ĐỊNH', 0)}\n"
-        f"🕓 Chưa kiểm tra: "
-        f"{states.get('CHƯA KIỂM TRA', 0)}"
+        f"🟢 LIVE đã ghi nhận: {states.get('LIVE', 0)}\n"
+        f"🔴 DIE đã ghi nhận: {states.get('DIE', 0)}\n"
+        f"⚪ Không xác định: {states.get('KHÔNG XÁC ĐỊNH', 0)}\n"
+        f"🕓 Chưa kiểm tra: {states.get('CHƯA KIỂM TRA', 0)}"
     )
 
 
@@ -148,7 +156,7 @@ def handle_callback(callback):
     data = callback.get("data", "")
 
     if user_id != ADMIN_ID:
-        answer_callback(callback_id)
+        answer_callback(callback_id, "Bạn không có quyền.")
         return
 
     answer_callback(callback_id)
@@ -157,7 +165,7 @@ def handle_callback(callback):
         send(
             chat_id,
             "➕ THÊM UID FACEBOOK\n"
-            "Gửi cú pháp:\n"
+            "Gửi lệnh:\n"
             "/adduid UID ghi_chu\n"
             "Ví dụ: /adduid 123456789 can_theo_doi"
         )
@@ -171,8 +179,7 @@ def handle_callback(callback):
     elif data == "account":
         send(
             chat_id,
-            f"👤 LHTMEDIA ADMIN\n"
-            f"Telegram ID: {ADMIN_ID}"
+            f"👤 LHTMEDIA ADMIN\nTelegram ID: {ADMIN_ID}"
         )
 
     elif data == "support":
@@ -223,10 +230,7 @@ def handle_message(message):
                 )
                 DB.commit()
 
-            send(
-                chat_id,
-                f"✅ Đã lưu UID.\nMã quản lý: #{cur.lastrowid}"
-            )
+            send(chat_id, f"✅ Đã lưu UID. Mã quản lý: #{cur.lastrowid}")
 
         except sqlite3.IntegrityError:
             send(chat_id, "ℹ️ UID này đã tồn tại.")
@@ -242,10 +246,7 @@ def handle_message(message):
             or not parts[1].isdigit()
             or parts[2].upper() not in ("LIVE", "DIE", "UNKNOWN")
         ):
-            send(
-                chat_id,
-                "Cú pháp: /setstatus ID LIVE|DIE|UNKNOWN"
-            )
+            send(chat_id, "Cú pháp: /setstatus ID LIVE|DIE|UNKNOWN")
             return
 
         status = {
@@ -271,13 +272,13 @@ def handle_message(message):
         if row:
             send(
                 chat_id,
-                f"🔔 CẬP NHẬT UID\n"
+                f"🔔 LHTMEDIA CẬP NHẬT UID\n"
                 f"UID: {row[0]}\n"
                 f"{row[1]} → {status}\n"
                 f"Nguồn: Admin cập nhật thủ công."
             )
         else:
-            send(chat_id, "❌ Không tìm thấy mã quản lý.")
+            send(chat_id, "❌ Không tìm thấy mã UID.")
 
     elif text in ("/stats", "/uidstatus"):
         show_stats(chat_id)
@@ -287,7 +288,7 @@ def handle_message(message):
             chat_id,
             "/start - Mở menu\n"
             "/adduid UID ghi_chu - Thêm UID\n"
-            "/uids - Danh sách\n"
+            "/uids - Danh sách UID\n"
             "/setstatus ID LIVE|DIE|UNKNOWN - Cập nhật thủ công\n"
             "/stats - Thống kê"
         )
@@ -339,10 +340,7 @@ def home():
 if __name__ == "__main__":
     init_db()
 
-    Thread(
-        target=polling,
-        daemon=True
-    ).start()
+    Thread(target=polling, daemon=True).start()
 
     app.run(
         host="0.0.0.0",
