@@ -38,10 +38,8 @@ cur.execute("""CREATE TABLE IF NOT EXISTS tasks (
 db.commit()
 
 
-def send(chat_id, text, keyboard=None, parse_mode=None):
+def send(chat_id, text, keyboard=None):
     data = {"chat_id": chat_id, "text": text}
-    if parse_mode:
-        data["parse_mode"] = parse_mode
     if keyboard:
         data["reply_markup"] = {"inline_keyboard": keyboard}
     try:
@@ -75,10 +73,47 @@ def handle_message(message):
         send(chat_id, "⛔ Bạn không có quyền sử dụng bot.")
         return
 
-    if text == "/start":
+    if text in ("/start", "/menu", "🔄 Làm mới menu"):
         menu(chat_id)
 
-    elif text == "/help":
+    elif text == "➕ Thêm UID FB":
+        send(chat_id, "➕ THÊM UID FACEBOOK\\nGửi theo cú pháp:\\n/adduid UID ghi_chu\\nVí dụ: /adduid 123456789 can_kiem_tra")
+
+    elif text in ("📋 Danh sách UID",):
+        text = "/uids"
+
+    elif text == "🔎 Trạng thái UID":
+        text = "/uidstatus"
+
+    elif text == "📊 Thống kê":
+        rows_uid = cur.execute("SELECT COUNT(*) FROM uids").fetchone()[0]
+        rows_tpl = cur.execute("SELECT COUNT(*) FROM templates").fetchone()[0]
+        rows_task = cur.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
+        send(chat_id, f"📊 THỐNG KÊ LHTMEDIA\\n👤 UID: {rows_uid}\\n💬 Mẫu nội dung: {rows_tpl}\\n📌 Nhiệm vụ: {rows_task}")
+        return
+
+    elif text == "📝 Ghi chú UID":
+        send(chat_id, "📝 Để thêm UID kèm ghi chú, gửi:\\n/adduid UID ghi_chu")
+        return
+
+    elif text == "💬 Mẫu nội dung":
+        text = "/templates"
+
+    elif text == "📌 Nhiệm vụ":
+        text = "/tasks"
+
+    elif text == "👤 Tài khoản":
+        send(chat_id, f"👤 TÀI KHOẢN ADMIN\\nTelegram ID: {ADMIN_ID}\\nQuyền: Quản trị LHTMEDIA")
+        return
+
+    elif text == "💬 Chat Support":
+        send(chat_id, "💬 Hỗ trợ LHTMEDIA\\nBạn có thể gửi nội dung lỗi hoặc ảnh chụp màn hình tại đây.")
+        return
+
+    elif text == "ℹ️ Hướng dẫn":
+        text = "/help"
+
+    if text == "/help":
         send(chat_id,
              "LHTMEDIA – LỆNH ADMIN\n"
              "/adduid UID ghi_chu - Thêm UID\n"
@@ -145,23 +180,12 @@ def handle_message(message):
         db.commit()
 
         if new_status != old_status:
-            status_icon = {
-                "LIVE": "🟢",
-                "DIE": "🔴",
-                "KHÔNG XÁC ĐỊNH": "⚪"
-            }[new_status]
-            profile_link = f"https://www.facebook.com/{row[0]}"
-            send(
-                chat_id,
-                "📘 <b>FACEBOOK PROFILE</b>\n"
-                f"👤 UID: <code>{row[0]}</code>\n"
-                f"🔗 <a href=\"{profile_link}\">Mở hồ sơ Facebook</a>\n"
-                f"{status_icon} <b>Trạng thái:</b> {new_status}\n"
-                f"🕒 <b>Thời gian cập nhật:</b> {time.strftime('%d/%m/%Y %H:%M:%S')}\n"
-                "📊 <b>Nguồn:</b> Admin xác nhận thủ công\n"
-                "ℹ️ Đây không phải kết quả quét tự động từ Facebook.",
-                parse_mode="HTML"
-            )
+            send(chat_id,
+                 "🔔 LHTMEDIA – CẬP NHẬT TRẠNG THÁI\n"
+                 f"UID: {row[0]}\n"
+                 f"Trạng thái cũ: {old_status}\n"
+                 f"Trạng thái mới: {new_status}\n"
+                 "Nguồn: admin cập nhật thủ công.")
         else:
             send(chat_id, f"ℹ️ UID {row[0]} vẫn ở trạng thái {new_status}.")
 
